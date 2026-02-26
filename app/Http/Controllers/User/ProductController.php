@@ -4,7 +4,10 @@ namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Models\Transaction;
+use App\Models\TransactionItem;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
@@ -34,6 +37,9 @@ class ProductController extends Controller
                 case 'newest':
                     $query->latest();
                     break;
+                case 'popular':
+                    $query->orderBy('stock', 'desc');
+                    break;
             }
         }
 
@@ -47,6 +53,7 @@ class ProductController extends Controller
     {
         $product = Product::where('slug', $slug)->where('is_active', true)->firstOrFail();
 
+        // Related products
         $relatedProducts = Product::where('category', $product->category)
             ->where('id', '!=', $product->id)
             ->where('is_active', true)

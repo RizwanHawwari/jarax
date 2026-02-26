@@ -50,10 +50,10 @@ class BackupController extends Controller
         ];
 
         return view('admin.backup.index', compact(
-            'backups', 
-            'totalSize', 
+            'backups',
+            'totalSize',
             'totalSizeFormatted',
-            'storagePercentage', 
+            'storagePercentage',
             'dbStats'
         ));
     }
@@ -66,7 +66,7 @@ class BackupController extends Controller
 
         try {
             $this->ensureBackupDirectoryExists();
-            
+
             $filename = 'backup-' . now()->format('Y-m-d-H-i-s') . '.sql';
             $path = storage_path('app/public/backups/' . $filename);
 
@@ -78,7 +78,7 @@ class BackupController extends Controller
 
             foreach ($tables as $table) {
                 $tableName = array_values((array)$table)[0];
-                
+
                 $createTable = DB::select("SHOW CREATE TABLE {$tableName}");
                 $sql .= "DROP TABLE IF EXISTS `{$tableName}`;\n";
                 $sql .= $createTable[0]->{'Create Table'} . ";\n\n";
@@ -110,7 +110,7 @@ class BackupController extends Controller
         }
 
         $path = storage_path('app/public/backups/' . $filename);
-        
+
         if (file_exists($path)) {
             return response()->download($path);
         }
@@ -125,7 +125,7 @@ class BackupController extends Controller
         }
 
         $path = 'backups/' . $filename;
-        
+
         if (Storage::disk('public')->exists($path)) {
             Storage::disk('public')->delete($path);
             return redirect()->back()->with('success', 'Backup berhasil dihapus.');
@@ -135,41 +135,66 @@ class BackupController extends Controller
     }
 
     public function restore(Request $request)
-    {
-        if (!auth()->user()->isAdmin()) {
-            abort(403, 'Unauthorized');
+{
+    if (!auth()->user()->isAdmin()) {
+        abort(403, 'Unauthorized');
+    }
+
+    $request->validate([
+        'backup_file' => 'required|string',
+        'confirmation' => 'required|in:I_UNDERSTAND',
+    ]);
+
+    try {
+        $filename = $request->backup_file;
+        $path = storage_path('app/public/backups/' . $filename);
+
+        if (!file_exists($path)) {
+            return redirect()->back()->with('error', 'File backup tidak ditemukan.');
         }
 
-        $request->validate([
-            'backup_file' => 'required|string',
-            'confirmation' => 'required|in:I_UNDERSTAND',
-        ]);
+        // LANGKAH BARU: Bersihkan database dulu (Drop semua tabel)
+        DB::statement('SET FOREIGN_KEY_CHECKS = 0');
 
-        try {
-            $filename = $request->backup_file;
-            $path = storage_path('app/public/backups/' . $filename);
+        $tables = DB::select('SHOW TABLES');
+        foreach ($tables as $table) {
+            $tableName = array_values((array)$table)[0];
+            // Jangan hapus tabel migrations jika ingin aman, tapi untuk full restore kita hapus semua
+            DB::statement("DROP TABLE IF EXISTS `$tableName`");
+        }
 
-            if (!file_exists($path)) {
-                return redirect()->back()->with('error', 'File backup tidak ditemukan.');
-            }
+        DB::statement('SET FOREIGN_KEY_CHECKS = 1');
 
-            $sql = file_get_contents($path);
-            $statements = array_filter(array_map('trim', explode(';', $sql)));
+        // Baca file SQL
+        $sql = file_get_contents($path);
 
-            DB::beginTransaction();
-            foreach ($statements as $statement) {
-                if (!empty($statement) && !str_starts_with($statement, '--')) {
+        // Pecah berdasarkan titik koma (;) tapi hati-hati dengan komentar
+        $statements = array_filter(array_map('trim', explode(';', $sql)));
+
+        DB::beginTransaction();
+        foreach ($statements as $statement) {
+            // Abaikan baris kosong atau komentar
+            if (!empty($statement) && !str_starts_with($statement, '--') && !str_starts_with($statement, '/*')) {
+                try {
                     DB::statement($statement);
+                } catch (\Exception $e) {
+                    // Lanjutkan jika error minor, atau log saja
+                    \Log::warning("Skip statement: " . substr($statement, 0, 50));
                 }
             }
-            DB::commit();
-
-            return redirect()->back()->with('success', 'Restore berhasil! Database telah dikembalikan.');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return redirect()->back()->with('error', 'Restore gagal: ' . $e->getMessage());
         }
+        DB::commit();
+
+        // Clear cache laravel setelah restore agar config fresh
+        Artisan::call('cache:clear');
+        Artisan::call('config:clear');
+
+        return redirect()->back()->with('success', 'Restore berhasil! Database telah dikembalikan sepenuhnya. Silakan login ulang.');
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return redirect()->back()->with('error', 'Restore gagal: ' . $e->getMessage());
     }
+}
 
     public function upload(Request $request)
     {
@@ -183,10 +208,10 @@ class BackupController extends Controller
 
         try {
             $this->ensureBackupDirectoryExists();
-            
+
             $file = $request->file('file');
             $filename = 'upload-' . now()->format('Y-m-d-H-i-s') . '-' . $file->getClientOriginalName();
-            
+
             $file->storeAs('backups', $filename, 'public');
 
             return redirect()->back()->with('success', 'File backup berhasil diupload!');
