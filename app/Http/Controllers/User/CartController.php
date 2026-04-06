@@ -198,7 +198,7 @@ class CartController extends Controller
             ->where('is_selected', true)
             ->delete();
 
-        return redirect()->route('user.orders')
+        return redirect()->route('user.orders.index')
             ->with('success', 'Pesanan berhasil dibuat! Silakan lakukan pembayaran.');
     }
 

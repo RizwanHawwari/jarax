@@ -7,7 +7,7 @@
                 <p class="text-gray-500">Lengkapi informasi untuk menyelesaikan pesanan</p>
             </div>
 
-            <form action="{{ route('checkout.process') }}" method="POST">
+            <form action="{{ route('user.checkout.process') }}" method="POST">
                 @csrf
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <!-- Checkout Form (2/3 width) -->

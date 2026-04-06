@@ -67,6 +67,37 @@
             </div>
 
             <!-- Orders Table -->
+
+            {{-- Flash Messages --}}
+@if(session('success'))
+    <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl flex items-start">
+        <svg class="w-5 h-5 text-green-500 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+        <span class="text-green-700">{{ session('success') }}</span>
+    </div>
+@endif
+
+@if(session('error'))
+    <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start">
+        <svg class="w-5 h-5 text-red-500 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+        <span class="text-red-700">{{ session('error') }}</span>
+    </div>
+@endif
+
+{{-- Validation Errors --}}
+@if($errors->any())
+    <div class="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-xl">
+        <ul class="list-disc list-inside text-orange-700 text-sm space-y-1">
+            @foreach($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div class="p-6 border-b border-gray-100">
                     <h2 class="text-lg font-semibold text-gray-800">Riwayat Pesanan</h2>
@@ -114,9 +145,37 @@
                                             {{ ucfirst($order->status) }}
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <a href="{{ route('admin.transactions.show', $order) }}" class="text-sm text-[#F95738] hover:underline font-medium">Detail</a>
-                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap space-y-2">
+
+    <!-- Detail User (bukan admin!) -->
+    <a href="{{ route('user.orders.show', $order) }}"
+       class="text-sm text-[#F95738] hover:underline font-medium block">
+        Detail
+    </a>
+
+    <!-- UPLOAD BUKTI PEMBAYARAN -->
+    <!-- UPLOAD BUKTI PEMBAYARAN -->
+@if($order->status === 'pending')
+    <form action="{{ route('user.transactions.upload-proof', $order->id) }}"
+          method="POST"
+          enctype="multipart/form-data"
+          class="space-y-2 mt-2">
+
+        @csrf
+
+        <input type="file"
+               name="payment_proof"
+               class="text-xs"
+               required>
+
+        <button type="submit"
+                class="bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1 rounded">
+            Upload Bukti
+        </button>
+    </form>
+@endif
+
+</td>
                                 </tr>
                             @empty
                                 <tr>

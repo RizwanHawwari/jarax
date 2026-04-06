@@ -3,73 +3,88 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\ProductController as AdminProductController;
-use App\Http\Controllers\Admin\TransactionController;
+use App\Http\Controllers\Admin\TransactionController as AdminTransactionController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\BackupController;
+
 use App\Http\Controllers\User\UserDashboardController;
 use App\Http\Controllers\User\ChatController;
 use App\Http\Controllers\User\CartController;
 use App\Http\Controllers\User\ProductController as UserProductController;
+use App\Http\Controllers\User\TransactionController as UserTransactionController;
+use App\Http\Controllers\User\OrderController;
+
 use Illuminate\Support\Facades\Route;
 
+// ============================================
+// ROOT
+// ============================================
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('login');
 });
 
+
 // ============================================
-// USER ROUTES (HARUS SEBELUM ADMIN!)
+// USER ROUTES
 // ============================================
 Route::middleware(['auth'])->prefix('user')->name('user.')->group(function () {
-    Route::get('/dashboard', [UserDashboardController::class, 'index'])->name('dashboard');
-    Route::get('/orders', [UserDashboardController::class, 'orders'])->name('orders');
 
-    // Product Routes - HARUS SPESIFIK
+    // Dashboard
+    Route::get('/dashboard', [UserDashboardController::class, 'index'])->name('dashboard');
+
+    // Orders
+    Route::get('/orders', [UserDashboardController::class, 'orders'])->name('orders.index');
+    Route::get('/orders/{transaction}', [OrderController::class, 'show'])->name('orders.show');
+
+    // Products
     Route::get('/products', [UserProductController::class, 'index'])->name('products.index');
     Route::get('/products/{slug}', [UserProductController::class, 'show'])->name('products.show');
     Route::get('/search', [UserProductController::class, 'search'])->name('search');
 
-    // Chat Routes
-Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
-Route::post('/chat/send', [ChatController::class, 'sendMessage'])->name('chat.send');
-Route::get('/chat/messages/{adminId}', [ChatController::class, 'getMessages'])->name('chat.messages');
+    // Cart
+    Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
+    Route::post('/cart/add', [CartController::class, 'add'])->name('cart.add');
+    Route::post('/cart/update/{id}', [CartController::class, 'update'])->name('cart.update');
+    Route::post('/cart/toggle/{id}', [CartController::class, 'toggleSelect'])->name('cart.toggle');
+    Route::delete('/cart/remove/{id}', [CartController::class, 'remove'])->name('cart.remove');
+    Route::get('/cart/count', [CartController::class, 'count'])->name('cart.count');
 
-// Cart Routes
-Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
-Route::post('/cart/add', [CartController::class, 'add'])->name('cart.add');
-Route::post('/cart/update/{id}', [CartController::class, 'update'])->name('cart.update');
-Route::post('/cart/toggle/{id}', [CartController::class, 'toggleSelect'])->name('cart.toggle');
-Route::delete('/cart/remove/{id}', [CartController::class, 'remove'])->name('cart.remove');
-Route::get('/checkout', [CartController::class, 'checkout'])->name('checkout.index');
-Route::post('/checkout', [CartController::class, 'processCheckout'])->name('checkout.process');
-Route::get('/cart/count', [CartController::class, 'count'])->name('cart.count');
-
-    // Checkout Routes ✅
+    // Checkout
     Route::get('/checkout', [CartController::class, 'checkout'])->name('checkout.index');
     Route::post('/checkout', [CartController::class, 'processCheckout'])->name('checkout.process');
+
+    // Upload Payment Proof (FIXED)
+    Route::post('/transactions/{transaction}/upload-proof', [UserTransactionController::class, 'uploadProof'])
+        ->name('transactions.upload-proof');
+
+    // Chat
+    Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
+    Route::post('/chat/send', [ChatController::class, 'sendMessage'])->name('chat.send');
+    Route::get('/chat/messages/{adminId}', [ChatController::class, 'getMessages'])->name('chat.messages');
 });
 
+
 // ============================================
-// ADMIN ROUTES (SETELAH USER!)
+// ADMIN ROUTES
 // ============================================
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
 
-    // Product Routes - Gunakan alias berbeda
-    Route::resource('products', AdminProductController::class)->parameters([
-        'products' => 'product' // Parameter name berbeda untuk menghindari konflik
-    ]);
+    // Products
+    Route::resource('products', AdminProductController::class);
 
-    // Transaction Routes
-    Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
-    Route::get('/transactions/{transaction}', [TransactionController::class, 'show'])->name('transactions.show');
-    Route::post('/transactions/{transaction}/verify', [TransactionController::class, 'verify'])->name('transactions.verify');
-    Route::post('/transactions/{transaction}/ship', [TransactionController::class, 'ship'])->name('transactions.ship');
-    Route::post('/transactions/{transaction}/complete', [TransactionController::class, 'complete'])->name('transactions.complete');
-    Route::post('/transactions/{transaction}/proof', [TransactionController::class, 'updateProof'])->name('transactions.proof');
+    // Transactions
+    Route::get('/transactions', [AdminTransactionController::class, 'index'])->name('transactions.index');
+    Route::get('/transactions/{transaction}', [AdminTransactionController::class, 'show'])->name('transactions.show');
+    Route::post('/transactions/{transaction}/verify', [AdminTransactionController::class, 'verify'])->name('transactions.verify');
+    Route::post('/transactions/{transaction}/ship', [AdminTransactionController::class, 'ship'])->name('transactions.ship');
+    Route::post('/transactions/{transaction}/complete', [AdminTransactionController::class, 'complete'])->name('transactions.complete');
+    Route::post('/transactions/{transaction}/proof', [AdminTransactionController::class, 'updateProof'])->name('transactions.proof');
 
-    // User Routes
+    // Users
     Route::get('/users', [UserController::class, 'index'])->name('users.index');
     Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show');
     Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
@@ -78,7 +93,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/users/{user}/unban', [UserController::class, 'unban'])->name('users.unban');
     Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
 
-    // Staff/Petugas Routes
+    // Staff
     Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
     Route::get('/staff/create', [StaffController::class, 'create'])->name('staff.create');
     Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
@@ -88,13 +103,13 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('staff.destroy');
     Route::post('/staff/{staff}/toggle-status', [StaffController::class, 'toggleStatus'])->name('staff.toggle-status');
 
-    // Report Routes
+    // Reports
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('/reports/sales', [ReportController::class, 'sales'])->name('reports.sales');
     Route::get('/reports/stock', [ReportController::class, 'stock'])->name('reports.stock');
     Route::get('/reports/transactions', [ReportController::class, 'transactions'])->name('reports.transactions');
 
-    // Backup Routes
+    // Backup
     Route::get('/backup', [BackupController::class, 'index'])->name('backup.index');
     Route::post('/backup/create', [BackupController::class, 'create'])->name('backup.create');
     Route::get('/backup/download/{filename}', [BackupController::class, 'download'])->name('backup.download');
@@ -103,8 +118,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/backup/upload', [BackupController::class, 'upload'])->name('backup.upload');
 });
 
+
 // ============================================
-// PROFILE ROUTES
+// PROFILE
 // ============================================
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

@@ -1,82 +1,100 @@
 <?php
 
-namespace App\Http\Controllers\User;
+namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
-    public function index(Request $request)
+    public function index()
     {
-        $query = Product::where('is_active', true);
+        $products = Product::latest()->paginate(10);
 
-        // Search
-        if ($request->filled('search')) {
-            $query->where('name', 'like', '%' . $request->search . '%');
-        }
-
-        // Category filter
-        if ($request->filled('category')) {
-            $query->where('category', $request->category);
-        }
-
-        // Sort
-        if ($request->filled('sort')) {
-            switch ($request->sort) {
-                case 'price_low':
-                    $query->orderBy('price', 'asc');
-                    break;
-                case 'price_high':
-                    $query->orderBy('price', 'desc');
-                    break;
-                case 'newest':
-                    $query->latest();
-                    break;
-            }
-        }
-
-        $products = $query->paginate(12);
-        $categories = Product::select('category')->distinct()->pluck('category');
-
-        return view('user.products', compact('products', 'categories'));
+        return view('admin.products.index', compact('products'));
     }
 
-    public function show($slug)
+    public function create()
     {
-        $product = Product::where('slug', $slug)->where('is_active', true)->firstOrFail();
-
-        $relatedProducts = Product::where('category', $product->category)
-            ->where('id', '!=', $product->id)
-            ->where('is_active', true)
-            ->limit(4)
-            ->get();
-
-        return view('user.product-detail', compact('product', 'relatedProducts'));
+        return view('admin.products.create');
     }
 
-    public function search(Request $request)
+    public function store(Request $request)
     {
-        $query = Product::where('is_active', true);
-
-        if ($request->filled('q')) {
-            $query->where('name', 'like', '%' . $request->q . '%');
-        }
-
-        $products = $query->limit(10)->get();
-
-        return response()->json([
-            'success' => true,
-            'data' => $products->map(function ($product) {
-                return [
-                    'id' => $product->id,
-                    'name' => $product->name,
-                    'price' => $product->price,
-                    'slug' => $product->slug,
-                    'image' => $product->image ? asset('storage/' . $product->image) : null,
-                ];
-            }),
+        $request->validate([
+            'name' => 'required',
+            'price' => 'required|numeric',
+            'stock' => 'required|integer',
+            'image' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
+
+        $data = $request->all();
+
+        // SLUG
+        $data['slug'] = Str::slug($request->name);
+
+        // DEFAULT STATUS
+        $data['is_active'] = $request->has('is_active');
+
+        // IMAGE UPLOAD FIX
+        if ($request->hasFile('image')) {
+            $data['image'] = $request->file('image')->store('products', 'public');
+        }
+
+        Product::create($data);
+
+        return redirect()->route('admin.products.index')
+            ->with('success', 'Produk berhasil ditambahkan');
+    }
+
+    public function edit(Product $product)
+    {
+        return view('admin.products.edit', compact('product'));
+    }
+
+    public function update(Request $request, Product $product)
+    {
+        $request->validate([
+            'name' => 'required',
+            'price' => 'required|numeric',
+            'stock' => 'required|integer',
+            'image' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        ]);
+
+        $data = $request->all();
+
+        $data['slug'] = Str::slug($request->name);
+        $data['is_active'] = $request->has('is_active');
+
+        // IMAGE UPDATE FIX
+        if ($request->hasFile('image')) {
+
+            // hapus image lama
+            if ($product->image) {
+                Storage::disk('public')->delete($product->image);
+            }
+
+            $data['image'] = $request->file('image')->store('products', 'public');
+        }
+
+        $product->update($data);
+
+        return redirect()->route('admin.products.index')
+            ->with('success', 'Produk berhasil diupdate');
+    }
+
+    public function destroy(Product $product)
+    {
+        if ($product->image) {
+            Storage::disk('public')->delete($product->image);
+        }
+
+        $product->delete();
+
+        return redirect()->route('admin.products.index')
+            ->with('success', 'Produk berhasil dihapus');
     }
 }

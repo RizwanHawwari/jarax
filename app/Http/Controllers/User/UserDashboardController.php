@@ -1,36 +1,36 @@
 <?php
 
-namespace App\Http\Controllers\User; // ✅ Namespace harus ini
+namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\Transaction;
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class UserDashboardController extends Controller
 {
     public function index()
     {
-        $user = auth()->user();
+        $user = Auth::user();
 
-        // User's transactions
-        $recentOrders = Transaction::where('user_id', $user->id)
-            ->with(['items'])
+        // 🔹 Gunakan query scope / reusable logic jika sering dipakai
+        $transactionQuery = Transaction::where('user_id', $user->id);
+
+        // Stats - lebih efisien dengan single query jika memungkinkan
+        $totalOrders = $transactionQuery->count();
+        $pendingOrders = (clone $transactionQuery)->whereIn('status', ['pending', 'paid', 'processing'])->count();
+        $completedOrders = (clone $transactionQuery)->where('status', 'completed')->count();
+        $totalSpent = (clone $transactionQuery)
+            ->where('status', 'completed')
+            ->sum('total');
+
+        // Recent orders untuk dashboard
+        $recentOrders = (clone $transactionQuery)
+            ->with(['items.product']) // 🔹 Tambahkan .product agar bisa akses nama/gambar produk di view
             ->latest()
             ->limit(5)
             ->get();
-
-        // Stats
-        $totalOrders = Transaction::where('user_id', $user->id)->count();
-        $pendingOrders = Transaction::where('user_id', $user->id)
-            ->whereIn('status', ['pending', 'paid', 'processing'])
-            ->count();
-        $completedOrders = Transaction::where('user_id', $user->id)
-            ->where('status', 'completed')
-            ->count();
-        $totalSpent = Transaction::where('user_id', $user->id)
-            ->where('status', 'completed')
-            ->sum('total');
 
         // Recommended products
         $recommendedProducts = Product::where('is_active', true)
@@ -50,9 +50,10 @@ class UserDashboardController extends Controller
 
     public function orders()
     {
-        $user = auth()->user();
+        $user = Auth::user();
+        
         $orders = Transaction::where('user_id', $user->id)
-            ->with(['items.product'])
+            ->with(['items.product']) // 🔹 Pastikan relasi product di-load untuk tampilan item
             ->latest()
             ->paginate(10);
 

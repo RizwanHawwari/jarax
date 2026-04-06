@@ -91,7 +91,7 @@
 </a>
 
         <!-- Orders -->
-        <a href="{{ route('user.orders') }}" class="nav-link text-gray-600 hover:text-[#F95738] transition-colors hidden sm:block">
+        <a href="{{ route('user.orders.index') }}" class="nav-link text-gray-600 hover:text-[#F95738] transition-colors hidden sm:block">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
             </svg>
@@ -113,7 +113,7 @@
             <!-- Dropdown Menu -->
             <div id="userMenu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg py-2 border border-gray-100">
                 <a href="{{ route('user.dashboard') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-[#F95738]">Dashboard</a>
-                <a href="{{ route('user.orders') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-[#F95738]">Pesanan Saya</a>
+                <a href="{{ route('user.orders.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-[#F95738]">Pesanan Saya</a>
                 <a href="{{ route('user.chat.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-[#F95738]">Chat Penjual</a>
                 <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-[#F95738]">Wishlist</a>
                 <a href="{{ route('profile.edit') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-[#F95738]">Pengaturan</a>
