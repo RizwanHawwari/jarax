@@ -8,9 +8,85 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use App\Models\Product;
+use Illuminate\Support\Facades\DB;
 
 class TransactionController extends Controller
 {
+
+/**
+ * Tampilkan detail pesanan user
+ */
+public function show(Transaction $transaction)
+    {
+        if ($transaction->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $transaction->load(['items.product', 'user']);
+
+        // Safety tambahan: cek apakah ada item dengan stok bermasalah
+        $outOfStockItems = $transaction->items->filter(function ($item) {
+            return $item->product && !$item->product->isAvailable();
+        });
+
+        if ($outOfStockItems->isNotEmpty()) {
+            // Optional: beri notifikasi ke user
+            session()->flash('warning', 'Beberapa produk dalam pesanan ini sudah habis stok.');
+        }
+
+        return view('user.order-show', compact('transaction'));
+    }
+
+public function store(Request $request)
+{
+    $cart = session('cart'); // atau $request->cart_items
+
+    DB::beginTransaction();
+    try {
+        $transaction = Transaction::create([
+            'user_id' => Auth::id(),
+            'total'   => $request->total,
+            'status'  => 'pending',
+            // ... field lain
+        ]);
+
+        foreach ($cart as $item) {
+            $product = Product::lockForUpdate()->findOrFail($item['id']);
+
+            // === VALIDASI STOK ===
+            if (!$product->isAvailable() || $product->stock < $item['qty']) {
+                DB::rollBack();
+                return redirect()->back()
+                    ->with('error', "❌ Stok {$product->name} tidak mencukupi atau sudah habis!");
+            }
+
+            // Kurangi stok
+            $product->decrement('stock', $item['qty']);
+
+            // Buat item
+            TransactionItem::create([
+                'transaction_id' => $transaction->id,
+                'product_id'     => $product->id,
+                'quantity'       => $item['qty'],
+                'price'          => $product->price,
+            ]);
+        }
+
+        // Bersihkan cart
+        session()->forget('cart');
+
+        DB::commit();
+
+        return redirect()->route('user.orders.show', $transaction)
+            ->with('success', 'Pesanan berhasil dibuat!');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return redirect()->back()->with('error', 'Terjadi kesalahan saat checkout.');
+    }
+}
+
     public function uploadProof(Request $request, Transaction $transaction)
     {
         // 🪵 Logging untuk debugging

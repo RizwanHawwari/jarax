@@ -139,35 +139,6 @@
             </div>
         </div>
 
-        <!-- Payment Method -->
-        <div class="mb-6">
-            <h3 class="text-sm font-semibold text-gray-700 mb-3">Metode Pembayaran</h3>
-            <div class="space-y-2">
-                <label class="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-[#F95738] transition-colors">
-                    <input type="radio" name="payment_method" value="transfer_bank" checked class="w-4 h-4 text-[#F95738]">
-                    <span class="ml-3 text-sm text-gray-700">Transfer Bank (BCA)</span>
-                </label>
-                <label class="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-[#F95738] transition-colors">
-                    <input type="radio" name="payment_method" value="ewallet" class="w-4 h-4 text-[#F95738]">
-                    <span class="ml-3 text-sm text-gray-700">E-Wallet (GoPay/OVO)</span>
-                </label>
-                <label class="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:border-[#F95738] transition-colors">
-                    <input type="radio" name="payment_method" value="cod" class="w-4 h-4 text-[#F95738]">
-                    <span class="ml-3 text-sm text-gray-700">Bayar di Tempat (COD)</span>
-                </label>
-            </div>
-        </div>
-
-        <!-- Shipping Address -->
-        <div class="mb-6">
-            <h3 class="text-sm font-semibold text-gray-700 mb-3">Alamat Pengiriman</h3>
-            <div class="bg-gray-50 rounded-lg p-4">
-                <p class="text-sm font-medium text-gray-800">{{ auth()->user()->full_name }}</p>
-                <p class="text-sm text-gray-600 mt-1">{{ auth()->user()->phone_number ?? 'Belum ada nomor telepon' }}</p>
-                <p class="text-sm text-gray-500 mt-2 text-xs">Alamat akan dikonfirmasi saat checkout</p>
-            </div>
-        </div>
-
         <!-- Checkout Button -->
         @if($selectedCount > 0)
             <a href="{{ route('user.checkout.index') }}" class="block w-full bg-[#F95738] hover:bg-orange-600 text-white text-center py-3 rounded-xl font-semibold transition-all hover:shadow-lg">

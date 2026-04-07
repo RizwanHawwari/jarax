@@ -4,16 +4,13 @@ namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
-use App\Models\Transaction;
-use App\Models\TransactionItem;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Product::where('is_active', true);
+        $query = Product::available();   // ← pakai scope available
 
         // Search
         if ($request->filled('search')) {
@@ -51,12 +48,14 @@ class ProductController extends Controller
 
     public function show($slug)
     {
-        $product = Product::where('slug', $slug)->where('is_active', true)->firstOrFail();
+        $product = Product::where('slug', $slug)
+                          ->where('is_active', true)   // tetap bisa dilihat meski stok 0
+                          ->firstOrFail();
 
-        // Related products
-        $relatedProducts = Product::where('category', $product->category)
+        // Related products (hanya yang available)
+        $relatedProducts = Product::available()
+            ->where('category', $product->category)
             ->where('id', '!=', $product->id)
-            ->where('is_active', true)
             ->limit(4)
             ->get();
 
@@ -65,13 +64,12 @@ class ProductController extends Controller
 
     public function search(Request $request)
     {
-        $query = Product::where('is_active', true);
-
-        if ($request->filled('q')) {
-            $query->where('name', 'like', '%' . $request->q . '%');
-        }
-
-        $products = $query->limit(10)->get();
+        $products = Product::available()   // ← hanya tampilkan yang ready
+            ->when($request->filled('q'), function ($query) use ($request) {
+                $query->where('name', 'like', '%' . $request->q . '%');
+            })
+            ->limit(10)
+            ->get();
 
         return response()->json([
             'success' => true,
@@ -82,6 +80,7 @@ class ProductController extends Controller
                     'price' => $product->price,
                     'slug' => $product->slug,
                     'image' => $product->image ? asset('storage/' . $product->image) : null,
+                    'stock' => $product->stock,
                 ];
             }),
         ]);

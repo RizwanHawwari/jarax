@@ -14,7 +14,6 @@ use App\Http\Controllers\User\ChatController;
 use App\Http\Controllers\User\CartController;
 use App\Http\Controllers\User\ProductController as UserProductController;
 use App\Http\Controllers\User\TransactionController as UserTransactionController;
-use App\Http\Controllers\User\OrderController;
 
 use Illuminate\Support\Facades\Route;
 
@@ -25,7 +24,6 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
-
 // ============================================
 // USER ROUTES
 // ============================================
@@ -34,9 +32,12 @@ Route::middleware(['auth'])->prefix('user')->name('user.')->group(function () {
     // Dashboard
     Route::get('/dashboard', [UserDashboardController::class, 'index'])->name('dashboard');
 
-    // Orders
+    // Orders / Pesanan Saya
     Route::get('/orders', [UserDashboardController::class, 'orders'])->name('orders.index');
-    Route::get('/orders/{transaction}', [OrderController::class, 'show'])->name('orders.show');
+    
+    // Detail Pesanan (FIXED - menggunakan TransactionController)
+   Route::get('/orders/{transaction}', [UserTransactionController::class, 'show'])
+     ->name('orders.show');
 
     // Products
     Route::get('/products', [UserProductController::class, 'index'])->name('products.index');
@@ -55,16 +56,16 @@ Route::middleware(['auth'])->prefix('user')->name('user.')->group(function () {
     Route::get('/checkout', [CartController::class, 'checkout'])->name('checkout.index');
     Route::post('/checkout', [CartController::class, 'processCheckout'])->name('checkout.process');
 
-    // Upload Payment Proof (FIXED)
-    Route::post('/transactions/{transaction}/upload-proof', [UserTransactionController::class, 'uploadProof'])
-        ->name('transactions.upload-proof');
+    // Upload Bukti Pembayaran
+    Route::post('/transactions/{transaction}/upload-proof', 
+                [UserTransactionController::class, 'uploadProof'])
+         ->name('transactions.upload-proof');
 
     // Chat
     Route::get('/chat', [ChatController::class, 'index'])->name('chat.index');
     Route::post('/chat/send', [ChatController::class, 'sendMessage'])->name('chat.send');
     Route::get('/chat/messages/{adminId}', [ChatController::class, 'getMessages'])->name('chat.messages');
 });
-
 
 // ============================================
 // ADMIN ROUTES
@@ -117,7 +118,6 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/backup/restore', [BackupController::class, 'restore'])->name('backup.restore');
     Route::post('/backup/upload', [BackupController::class, 'upload'])->name('backup.upload');
 });
-
 
 // ============================================
 // PROFILE

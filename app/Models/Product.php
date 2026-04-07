@@ -27,7 +27,19 @@ class Product extends Model
         'is_active' => 'boolean',
     ];
 
-    // Auto generate slug from name
+    // Scope: hanya produk yang ready
+    public function scopeAvailable($query)
+    {
+        return $query->where('is_active', true)
+                     ->where('stock', '>', 0);
+    }
+
+    // Helper
+    public function isAvailable(): bool
+    {
+        return $this->is_active && $this->stock > 0;
+    }
+
     public static function boot()
     {
         parent::boot();

@@ -5,73 +5,73 @@ namespace App\Http\Controllers\User;
 use App\Http\Controllers\Controller;
 use App\Models\Cart;
 use App\Models\Product;
+use App\Models\Transaction;
+use App\Models\TransactionItem;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class CartController extends Controller
 {
     public function index()
-{
-    $user = auth()->user();
+    {
+        $user = auth()->user();
 
-    $cartItems = Cart::where('user_id', $user->id)
-        ->with(['product'])
-        ->get();
+        $cartItems = Cart::where('user_id', $user->id)
+            ->with(['product'])
+            ->get();
 
-    // Hitung items yang dipilih
-    $selectedItems = $cartItems->where('is_selected', true);
+        $selectedItems = $cartItems->where('is_selected', true);
 
-    // Hitung subtotal dari items yang dipilih
-    $subtotal = $selectedItems->sum(function($item) {
-        return $item->price * $item->quantity;
-    });
+        $subtotal = $selectedItems->sum(fn($item) => $item->price * $item->quantity);
+        $shippingCost = $subtotal > 0 ? 20000 : 0;
+        $total = $subtotal + $shippingCost;
+        $selectedCount = $selectedItems->sum('quantity');
 
-    // Ongkir flat rate
-    $shippingCost = $subtotal > 0 ? 20000 : 0;
+        // Cek stok yang bermasalah
+        $outOfStockItems = $selectedItems->filter(fn($item) => !$item->product?->isAvailable() || $item->product->stock < $item->quantity);
 
-    // Total
-    $total = $subtotal + $shippingCost;
-
-    // Hitung jumlah barang yang dipilih
-    $selectedCount = $selectedItems->sum('quantity');
-
-    return view('user.cart', compact(
-        'cartItems',
-        'selectedItems',
-        'subtotal',
-        'shippingCost',
-        'total',
-        'selectedCount'
-    ));
-}
+        return view('user.cart', compact(
+            'cartItems', 'selectedItems', 'subtotal', 'shippingCost', 'total', 'selectedCount', 'outOfStockItems'
+        ));
+    }
 
     public function add(Request $request)
     {
         $request->validate([
             'product_id' => 'required|exists:products,id',
-            'quantity' => 'required|integer|min:1',
-            'variant' => 'nullable|string|max:255',
+            'quantity'   => 'required|integer|min:1',
+            'variant'    => 'nullable|string|max:255',
         ]);
 
         $product = Product::findOrFail($request->product_id);
-        $user = auth()->user();
+        $user = Auth::user();
 
-        // Check if already in cart
+        // === VALIDASI STOK SAAT ADD ===
+        if (!$product->isAvailable() || $product->stock < $request->quantity) {
+            return redirect()->back()->with('error', "Stok {$product->name} tidak mencukupi atau sudah habis!");
+        }
+
         $existingCart = Cart::where('user_id', $user->id)
             ->where('product_id', $product->id)
             ->where('variant', $request->variant)
             ->first();
 
         if ($existingCart) {
-            $existingCart->quantity += $request->quantity;
+            $newQty = $existingCart->quantity + $request->quantity;
+            if ($product->stock < $newQty) {
+                return redirect()->back()->with('error', "Stok {$product->name} tidak mencukupi!");
+            }
+            $existingCart->quantity = $newQty;
             $existingCart->save();
         } else {
             Cart::create([
-                'user_id' => $user->id,
+                'user_id'    => $user->id,
                 'product_id' => $product->id,
-                'quantity' => $request->quantity,
-                'variant' => $request->variant,
-                'price' => $product->price,
-                'is_selected' => true,
+                'quantity'   => $request->quantity,
+                'variant'    => $request->variant,
+                'price'      => $product->price,
+                'is_selected'=> true,
             ]);
         }
 
@@ -80,13 +80,14 @@ class CartController extends Controller
 
     public function update(Request $request, $id)
     {
-        $request->validate([
-            'quantity' => 'required|integer|min:1',
-        ]);
+        $request->validate(['quantity' => 'required|integer|min:1']);
 
-        $cart = Cart::where('id', $id)
-            ->where('user_id', auth()->id())
-            ->firstOrFail();
+        $cart = Cart::where('id', $id)->where('user_id', Auth::id())->firstOrFail();
+        $product = $cart->product;
+
+        if (!$product->isAvailable() || $product->stock < $request->quantity) {
+            return redirect()->back()->with('error', "Stok {$product->name} tidak mencukupi!");
+        }
 
         $cart->quantity = $request->quantity;
         $cart->save();
@@ -96,10 +97,7 @@ class CartController extends Controller
 
     public function toggleSelect(Request $request, $id)
     {
-        $cart = Cart::where('id', $id)
-            ->where('user_id', auth()->id())
-            ->firstOrFail();
-
+        $cart = Cart::where('id', $id)->where('user_id', Auth::id())->firstOrFail();
         $cart->is_selected = !$cart->is_selected;
         $cart->save();
 
@@ -108,10 +106,7 @@ class CartController extends Controller
 
     public function remove($id)
     {
-        $cart = Cart::where('id', $id)
-            ->where('user_id', auth()->id())
-            ->firstOrFail();
-
+        $cart = Cart::where('id', $id)->where('user_id', Auth::id())->firstOrFail();
         $cart->delete();
 
         return redirect()->back()->with('success', 'Produk dihapus dari keranjang!');
@@ -119,21 +114,16 @@ class CartController extends Controller
 
     public function checkout()
     {
-        $user = auth()->user();
-
-        $cartItems = Cart::where('user_id', $user->id)
+        $cartItems = Cart::where('user_id', Auth::id())
             ->where('is_selected', true)
-            ->with(['product'])
+            ->with('product')
             ->get();
 
         if ($cartItems->isEmpty()) {
-            return redirect()->route('user.cart.index')
-                ->with('error', 'Keranjang kosong!');
+            return redirect()->route('user.cart.index')->with('error', 'Keranjang kosong!');
         }
 
-        $subtotal = $cartItems->sum(function($item) {
-            return $item->price * $item->quantity;
-        });
+        $subtotal = $cartItems->sum(fn($item) => $item->price * $item->quantity);
         $shippingCost = 20000;
         $total = $subtotal + $shippingCost;
 
@@ -142,69 +132,98 @@ class CartController extends Controller
 
     public function processCheckout(Request $request)
     {
-        $request->validate([
-            'payment_method' => 'required|in:transfer_bank,ewallet,cod',
+        $validated = $request->validate([
+            'payment_method'   => 'required|in:transfer_bank,ewallet,cod,qris',
             'shipping_address' => 'required|string|max:500',
-            'shipping_city' => 'required|string|max:100',
-            'shipping_phone' => 'required|string|max:20',
+            'shipping_city'    => 'required|string|max:100',
+            'shipping_phone'   => 'required|string|max:20',
+            'shipping_cost'    => 'nullable|numeric|min:0',
+            'notes'            => 'nullable|string|max:500',
         ]);
 
-        $user = auth()->user();
-        $cartItems = Cart::where('user_id', $user->id)
-            ->where('is_selected', true)
-            ->with(['product'])
-            ->get();
+        $user = Auth::user();
 
-        if ($cartItems->isEmpty()) {
-            return redirect()->back()->with('error', 'Keranjang kosong!');
-        }
+        DB::beginTransaction();
+        try {
+            $cartItems = Cart::where('user_id', $user->id)
+                ->where('is_selected', true)
+                ->with('product')
+                ->get();
 
-        // Create transaction
-        $subtotal = $cartItems->sum(function($item) {
-            return $item->price * $item->quantity;
-        });
-        $shippingCost = 20000;
-        $total = $subtotal + $shippingCost;
+            if ($cartItems->isEmpty()) {
+                DB::rollBack();
+                return redirect()->back()->with('error', 'Keranjang kosong!');
+            }
 
-        $transaction = \App\Models\Transaction::create([
-            'user_id' => $user->id,
-            'subtotal' => $subtotal,
-            'shipping_cost' => $shippingCost,
-            'total' => $total,
-            'status' => 'pending',
-            'shipping_address' => $request->shipping_address,
-            'shipping_city' => $request->shipping_city,
-            'shipping_phone' => $request->shipping_phone,
-            'notes' => $request->notes,
-        ]);
+            $subtotal = $cartItems->sum(fn($item) => $item->price * $item->quantity);
+            $shippingCost = $request->shipping_cost ?? 20000;
+            $total = $subtotal + $shippingCost;
 
-        // Create transaction items
-        foreach ($cartItems as $item) {
-            \App\Models\TransactionItem::create([
-                'transaction_id' => $transaction->id,
-                'product_id' => $item->product_id,
-                'product_name' => $item->product->name,
-                'quantity' => $item->quantity,
-                'price' => $item->price,
-                'subtotal' => $item->price * $item->quantity,
+            $orderReference = 'ORD-' . strtoupper(uniqid()) . '-' . rand(1000, 9999);
+
+            $transaction = Transaction::create([
+                'user_id'          => $user->id,
+                'order_reference'  => $orderReference,
+                'subtotal'         => $subtotal,
+                'shipping_cost'    => $shippingCost,
+                'total'            => $total,
+                'status'           => 'pending',
+                'payment_method'   => $validated['payment_method'],
+                'shipping_address' => $validated['shipping_address'],
+                'shipping_city'    => $validated['shipping_city'],
+                'shipping_phone'   => $validated['shipping_phone'],
+                'notes'            => $validated['notes'] ?? null,
             ]);
 
-            // Reduce stock
-            $item->product->decrement('stock', $item->quantity);
+            foreach ($cartItems as $item) {
+                $product = Product::lockForUpdate()->findOrFail($item->product_id);
+
+                // === VALIDASI STOK FINAL ===
+                if (!$product->isAvailable() || $product->stock < $item->quantity) {
+                    DB::rollBack();
+                    return redirect()->back()
+                        ->with('error', "❌ Stok {$product->name} tidak mencukupi atau sudah habis!");
+                }
+
+                // Kurangi stok
+                $product->decrement('stock', $item->quantity);
+
+                // Buat item transaksi
+                TransactionItem::create([
+                    'transaction_id' => $transaction->id,
+                    'product_id'     => $product->id,
+                    'product_name'   => $product->name,
+                    'quantity'       => $item->quantity,
+                    'price'          => $product->price,
+                    'subtotal'       => $product->price * $item->quantity,
+                ]);
+            }
+
+            // Hapus item yang sudah dibeli dari keranjang
+            Cart::where('user_id', $user->id)
+                ->where('is_selected', true)
+                ->delete();
+
+            DB::commit();
+
+            return redirect()->route('user.orders.index')
+                ->with('success', 'Pesanan berhasil dibuat!')
+                ->with('payment_method', $validated['payment_method'])
+                ->with('qris_data', $validated['payment_method'] === 'qris' ? [
+                    'amount'    => $total,
+                    'order_id'  => $orderReference,
+                    'qr_string' => 'QRIS|' . $orderReference . '|' . $total . '|TOKO-DEMO'
+                ] : null);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat checkout. Silakan coba lagi.');
         }
-
-        // Remove purchased items from cart
-        Cart::where('user_id', $user->id)
-            ->where('is_selected', true)
-            ->delete();
-
-        return redirect()->route('user.orders.index')
-            ->with('success', 'Pesanan berhasil dibuat! Silakan lakukan pembayaran.');
     }
 
     public function count()
     {
-        $count = Cart::where('user_id', auth()->id())->count();
+        $count = Cart::where('user_id', Auth::id())->count();
         return response()->json(['count' => $count]);
     }
 }
