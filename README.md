@@ -1,5 +1,3 @@
-
-````markdown
 # 🛍️ JaRax — Modern E-Commerce Platform
 
 ![JaRax Banner](https://via.placeholder.com/1200x400/FF6B35/ffffff?text=JaRax+E-Commerce)
