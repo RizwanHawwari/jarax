@@ -1,6 +1,6 @@
 # 🛍️ JaRax — Modern E-Commerce Platform
 
-![JaRax Banner](https://via.placeholder.com/1200x400/FF6B35/ffffff?text=JaRax+E-Commerce)
+![JaRax Banner](https://ibb.co.com/ZZN6zpG)
 
 > 🚀 Platform **e-commerce modern** berbasis Laravel 12 dengan tampilan clean, performa cepat, dan pengalaman pengguna yang optimal.
 
