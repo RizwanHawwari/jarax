@@ -1,3 +1,6 @@
+
+---
+
 ```markdown
 # JaRax - E-Commerce Modern
 
@@ -30,7 +33,6 @@ JaRax adalah platform **e-commerce modern** yang dibangun dengan Laravel 12, Tai
 
 ### Role Sistem
 - **Admin** → Akses penuh (termasuk kelola petugas)
-- **Petugas** → Akses ke dashboard, produk, transaksi, users, reports, backup
 - **User Biasa** → Hanya fitur belanja
 
 ---
@@ -98,10 +100,6 @@ JaRax adalah platform **e-commerce modern** yang dibangun dengan Laravel 12, Tai
 
 ### Admin
 - **Email**    : `admin@jarax.com`
-- **Password** : `password`
-
-### Petugas
-- **Email**    : `budi@jarax.com`
 - **Password** : `password`
 
 ### User Biasa
