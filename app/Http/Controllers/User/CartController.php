@@ -145,12 +145,11 @@ class CartController extends Controller
         return redirect()->route('user.checkout.index');
     }
 
-                public function checkout()
+                   public function checkout()
     {
         $buyNowItem = session('buy_now_item');
 
         if ($buyNowItem) {
-            // === MODE BUY NOW ===
             $product = Product::findOrFail($buyNowItem['product_id']);
 
             $cartItems = collect([
@@ -162,11 +161,7 @@ class CartController extends Controller
                     'is_selected'=> true,
                 ]
             ]);
-
-            // JANGAN forget di sini! Biarkan session tetap ada sampai processCheckout berhasil
-        } 
-        else {
-            // === MODE KERANJANG NORMAL ===
+        } else {
             $cartItems = Cart::where('user_id', Auth::id())
                 ->where('is_selected', true)
                 ->with('product')
@@ -189,9 +184,11 @@ class CartController extends Controller
     {
         $validated = $request->validate([
             'payment_method'   => 'required|in:transfer_bank,ewallet,cod,qris',
+            'shipping_name'    => 'required|string|max:100',
+            'shipping_phone'   => 'required|string|max:20',
             'shipping_address' => 'required|string|max:500',
             'shipping_city'    => 'required|string|max:100',
-            'shipping_phone'   => 'required|string|max:20',
+            'postal_code'      => 'nullable|string|max:10',
             'shipping_cost'    => 'nullable|numeric|min:0',
             'notes'            => 'nullable|string|max:500',
         ]);
@@ -203,14 +200,12 @@ class CartController extends Controller
         DB::beginTransaction();
         try {
             if ($isBuyNow) {
-                // ==================== BUY NOW MODE ====================
                 $product = Product::lockForUpdate()->findOrFail($buyNowItem['product_id']);
 
                 if (!$product->isAvailable() || $product->stock < $buyNowItem['quantity']) {
                     DB::rollBack();
                     session()->forget('buy_now_item');
-                    return redirect()->back()
-                        ->with('error', "❌ Stok {$product->name} tidak mencukupi atau sudah habis!");
+                    return redirect()->back()->with('error', "Stok {$product->name} tidak mencukupi!");
                 }
 
                 $cartItems = collect([
@@ -220,9 +215,7 @@ class CartController extends Controller
                         'price'      => $product->price,
                     ]
                 ]);
-            } 
-            else {
-                // ==================== NORMAL CART MODE ====================
+            } else {
                 $cartItems = Cart::where('user_id', $user->id)
                     ->where('is_selected', true)
                     ->with('product')
@@ -238,15 +231,13 @@ class CartController extends Controller
 
                     if (!$product->isAvailable() || $product->stock < $item->quantity) {
                         DB::rollBack();
-                        return redirect()->back()
-                            ->with('error', "❌ Stok {$product->name} tidak mencukupi atau sudah habis!");
+                        return redirect()->back()->with('error', "Stok {$product->name} tidak mencukupi!");
                     }
 
                     $product->decrement('stock', $item->quantity);
                 }
             }
 
-            // Hitung total
             $subtotal = $cartItems->sum(fn($item) => $item->price * $item->quantity);
             $shippingCost = $request->shipping_cost ?? 20000;
             $total = $subtotal + $shippingCost;
@@ -261,13 +252,14 @@ class CartController extends Controller
                 'total'            => $total,
                 'status'           => 'pending',
                 'payment_method'   => $validated['payment_method'],
+                'shipping_name'    => $validated['shipping_name'],
                 'shipping_address' => $validated['shipping_address'],
                 'shipping_city'    => $validated['shipping_city'],
+                'postal_code'      => $validated['postal_code'] ?? null,
                 'shipping_phone'   => $validated['shipping_phone'],
                 'notes'            => $validated['notes'] ?? null,
             ]);
 
-            // Buat Transaction Items
             foreach ($cartItems as $item) {
                 $productForItem = $isBuyNow 
                     ? Product::find($item->product_id) 
@@ -282,20 +274,17 @@ class CartController extends Controller
                     'subtotal'       => $item->price * $item->quantity,
                 ]);
 
-                // Kurangi stok (sudah dicek di atas)
                 if ($isBuyNow) {
                     Product::find($item->product_id)->decrement('stock', $item->quantity);
                 }
             }
 
-            // Hapus dari keranjang hanya jika bukan Buy Now
             if (!$isBuyNow) {
                 Cart::where('user_id', $user->id)
                     ->where('is_selected', true)
                     ->delete();
             }
 
-            // Hapus session Buy Now setelah berhasil
             if ($isBuyNow) {
                 session()->forget('buy_now_item');
             }
@@ -303,18 +292,12 @@ class CartController extends Controller
             DB::commit();
 
             return redirect()->route('user.orders.index')
-                ->with('success', 'Pesanan berhasil dibuat!')
-                ->with('payment_method', $validated['payment_method'])
-                ->with('qris_data', $validated['payment_method'] === 'qris' ? [
-                    'amount'    => $total,
-                    'order_id'  => $orderReference,
-                    'qr_string' => 'QRIS|' . $orderReference . '|' . $total . '|TOKO-DEMO'
-                ] : null);
+                ->with('success', 'Pesanan berhasil dibuat!');
 
         } catch (\Exception $e) {
             DB::rollBack();
             if ($isBuyNow) session()->forget('buy_now_item');
-            return redirect()->back()->with('error', 'Terjadi kesalahan saat checkout. Silakan coba lagi.');
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat checkout.');
         }
     }
 

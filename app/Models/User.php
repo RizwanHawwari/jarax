@@ -17,6 +17,9 @@ class User extends Authenticatable
     'email',
     'password',
     'phone_number',
+    'address',       
+    'city',          
+    'postal_code',   
     'role',
     'is_active',
     'is_banned',
@@ -29,7 +32,6 @@ class User extends Authenticatable
     'join_date',
     'notes',
 ];
-
     protected $hidden = [
         'password',
         'remember_token',
