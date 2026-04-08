@@ -43,7 +43,7 @@
 
                 <!-- Search Bar (Desktop) -->
 <div class="hidden md:flex flex-1 mx-8">
-    <form action="{{ route('user.products.index') }}" method="GET" class="relative w-full max-w-2xl mx-auto">
+    <form action="{{ route('products.index') }}" method="GET" class="relative w-full max-w-2xl mx-auto">
         <input type="text" name="search" id="searchInput" placeholder="Cari produk favoritmu..."
                value="{{ request('search') }}"
                class="w-full px-4 py-2 pl-12 pr-4 bg-gray-100 border-0 rounded-full focus:outline-none focus:ring-2 focus:ring-[#F95738] focus:bg-white transition-all">
@@ -231,7 +231,7 @@
     if (searchInput) {
         searchInput.addEventListener('input', function(e) {
             clearTimeout(debounceTimer);
-            const query = e.target.value;
+            const query = e.target.value.trim();
 
             if (query.length < 2) {
                 suggestionsBox.classList.add('hidden');
@@ -239,12 +239,13 @@
             }
 
             debounceTimer = setTimeout(() => {
-                fetch(`{{ route('user.search') }}?q=${query}`)
+                fetch(`{{ route('search') }}?q=${encodeURIComponent(query)}`)
                     .then(response => response.json())
                     .then(data => {
                         if (data.success && data.data.length > 0) {
                             suggestionsBox.innerHTML = data.data.map(product => `
-                                <a href="/user/products/${product.slug}" class="flex items-center gap-3 p-3 hover:bg-orange-50 transition-colors border-b border-gray-100 last:border-0">
+                                <a href="/products/${product.slug}" 
+                                   class="flex items-center gap-3 p-3 hover:bg-orange-50 transition-colors border-b border-gray-100 last:border-0">
                                     ${product.image ? `<img src="${product.image}" class="w-10 h-10 object-cover rounded">` : ''}
                                     <div class="flex-1">
                                         <p class="font-medium text-gray-800">${product.name}</p>
@@ -256,7 +257,8 @@
                         } else {
                             suggestionsBox.classList.add('hidden');
                         }
-                    });
+                    })
+                    .catch(() => suggestionsBox.classList.add('hidden'));
             }, 300);
         });
 

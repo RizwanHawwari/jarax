@@ -89,7 +89,7 @@
                         $showcaseProducts = $recommendedProducts->take(4);
                     @endphp
                     @foreach($showcaseProducts as $index => $product)
-                        <a href="{{ route('user.products.show', $product->slug) }}" 
+                        <a href="{{ route('products.show', $product->slug) }}" 
                            class="group focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40 rounded-3xl overflow-hidden">
                             <div class="floating-card bg-white/10 backdrop-blur-sm rounded-3xl p-4 transform hover:scale-[1.03] hover:-translate-y-2 transition-all duration-500 hover:shadow-2xl hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/30">
                                 <div class="bg-white rounded-2xl h-48 flex items-center justify-center mb-4 overflow-hidden relative shadow-sm">
@@ -157,7 +157,7 @@
                 @endphp
 
                 @foreach($categories as $category)
-                    <a href="{{ route('user.products.index', ['category' => $category['name']]) }}" class="group focus:outline-none focus-visible:ring-4 focus-visible:ring-[#F95738]/40 rounded-2xl">
+                    <a href="{{ route('products.index', ['category' => $category['name']]) }}" class="group focus:outline-none focus-visible:ring-4 focus-visible:ring-[#F95738]/40 rounded-2xl">
                         <div class="bg-white rounded-2xl p-6 text-center shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border border-gray-100 hover:border-gray-200">
                             <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br {{ $category['color'] }} flex items-center justify-center text-3xl group-hover:scale-110 transition-transform duration-300 shadow-sm group-hover:shadow-md">
                                 {{ $category['icon'] }}
@@ -200,7 +200,7 @@
 
             <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 @foreach($recommendedProducts as $product)
-                    <a href="{{ route('user.products.show', $product->slug) }}" class="group focus:outline-none focus-visible:ring-4 focus-visible:ring-[#F95738]/40 rounded-2xl">
+                    <a href="{{ route('products.show', $product->slug) }}" class="group focus:outline-none focus-visible:ring-4 focus-visible:ring-[#F95738]/40 rounded-2xl">
                         <div class="product-card bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 border border-gray-100 hover:border-gray-200">
                             <div class="relative h-48 bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
                                 @if($product->image)

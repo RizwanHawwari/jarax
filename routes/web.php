@@ -18,31 +18,26 @@ use App\Http\Controllers\User\TransactionController as UserTransactionController
 use Illuminate\Support\Facades\Route;
 
 // ============================================
-// ROOT
+// PUBLIC ROUTES (Guest / Belum Login)
 // ============================================
-Route::get('/', function () {
-    return redirect()->route('login');
-});
+Route::get('/', [UserDashboardController::class, 'index'])->name('dashboard');           // Landing Page
+
+// Produk (bisa dilihat siapa saja)
+Route::get('/products', [UserProductController::class, 'index'])->name('products.index');
+Route::get('/products/{slug}', [UserProductController::class, 'show'])->name('products.show');
+Route::get('/search', [UserProductController::class, 'search'])->name('search');
 
 // ============================================
-// USER ROUTES
+// PROTECTED ROUTES (Harus Login) - Prefix /user
 // ============================================
-Route::middleware(['auth'])->prefix('user')->name('user.')->group(function () {
+Route::middleware('auth')->prefix('user')->name('user.')->group(function () {
 
-    // Dashboard
+    // Dashboard khusus user yang sudah login (bisa beda tampilan nanti)
     Route::get('/dashboard', [UserDashboardController::class, 'index'])->name('dashboard');
 
-    // Orders / Pesanan Saya
+    // Orders
     Route::get('/orders', [UserDashboardController::class, 'orders'])->name('orders.index');
-    
-    // Detail Pesanan (FIXED - menggunakan TransactionController)
-   Route::get('/orders/{transaction}', [UserTransactionController::class, 'show'])
-     ->name('orders.show');
-
-    // Products
-    Route::get('/products', [UserProductController::class, 'index'])->name('products.index');
-    Route::get('/products/{slug}', [UserProductController::class, 'show'])->name('products.show');
-    Route::get('/search', [UserProductController::class, 'search'])->name('search');
+    Route::get('/orders/{transaction}', [UserTransactionController::class, 'show'])->name('orders.show');
 
     // Cart
     Route::get('/cart', [CartController::class, 'index'])->name('cart.index');
@@ -51,6 +46,9 @@ Route::middleware(['auth'])->prefix('user')->name('user.')->group(function () {
     Route::post('/cart/toggle/{id}', [CartController::class, 'toggleSelect'])->name('cart.toggle');
     Route::delete('/cart/remove/{id}', [CartController::class, 'remove'])->name('cart.remove');
     Route::get('/cart/count', [CartController::class, 'count'])->name('cart.count');
+
+    // Buy Now
+    Route::post('/buy-now', [CartController::class, 'buyNow'])->name('buy.now');
 
     // Checkout
     Route::get('/checkout', [CartController::class, 'checkout'])->name('checkout.index');

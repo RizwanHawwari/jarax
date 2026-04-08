@@ -9,7 +9,7 @@
 
             <!-- Filters -->
             <div class="bg-white rounded-xl p-6 shadow-sm mb-8">
-                <form action="{{ route('user.products.index') }}" method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <form action="{{ route('products.index') }}" method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Kategori</label>
                         <select name="category" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F95738]">
@@ -40,7 +40,7 @@
             <!-- Products Grid -->
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 @foreach($products as $product)
-                    <a href="{{ route('user.products.show', $product->slug) }}" class="group">
+                    <a href="{{ route('products.show', $product->slug) }}" class="group">
                         <div class="product-card bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 border border-gray-100">
                             <div class="aspect-square bg-gray-100 overflow-hidden">
                                 @if($product->image)

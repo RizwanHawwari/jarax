@@ -108,7 +108,7 @@
                                     </div>
                                     <h3 class="text-lg font-semibold text-gray-800 mb-2">Keranjang Kosong</h3>
                                     <p class="text-gray-500 mb-4">Mulai belanja untuk menambahkan produk</p>
-                                    <a href="{{ route('user.products.index') }}" class="inline-block bg-[#F95738] hover:bg-orange-600 text-white px-6 py-2 rounded-full font-medium transition-colors">
+                                    <a href="{{ route('products.index') }}" class="inline-block bg-[#F95738] hover:bg-orange-600 text-white px-6 py-2 rounded-full font-medium transition-colors">
                                         Belanja Sekarang
                                     </a>
                                 </div>
@@ -151,14 +151,14 @@
         @endif
 
         <!-- Continue Shopping -->
-        <a href="{{ route('user.products.index') }}" class="block text-center text-sm text-[#F95738] hover:underline mt-4">
+        <a href="{{ route('products.index') }}" class="block text-center text-sm text-[#F95738] hover:underline mt-4">
             Lanjut Belanja →
         </a>
     </div>
 </div>
 
                         <!-- Continue Shopping -->
-                        <a href="{{ route('user.products.index') }}" class="block text-center text-sm text-[#F95738] hover:underline mt-4">
+                        <a href="{{ route('products.index') }}" class="block text-center text-sm text-[#F95738] hover:underline mt-4">
                             Lanjut Belanja →
                         </a>
                     </div>

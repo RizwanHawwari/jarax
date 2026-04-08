@@ -112,15 +112,70 @@ class CartController extends Controller
         return redirect()->back()->with('success', 'Produk dihapus dari keranjang!');
     }
 
-    public function checkout()
+    public function buyNow(Request $request)
     {
-        $cartItems = Cart::where('user_id', Auth::id())
-            ->where('is_selected', true)
-            ->with('product')
-            ->get();
+        $request->validate([
+            'product_id' => 'required|exists:products,id',
+            'quantity'   => 'required|integer|min:1',
+            'variant'    => 'nullable|string|max:255',
+        ]);
+
+        $product = Product::findOrFail($request->product_id);
+
+        // Validasi stok
+        if (!$product->isAvailable() || $product->stock < $request->quantity) {
+            return redirect()->back()
+                ->with('error', "Stok {$product->name} tidak mencukupi atau sudah habis!");
+        }
+
+        $user = Auth::user();
+
+        // Simpan data buy now ke session
+        $buyNowItem = [
+            'product_id' => $product->id,
+            'quantity'   => $request->quantity,
+            'variant'    => $request->variant ?? 'Default',
+            'price'      => $product->price,
+            'name'       => $product->name,
+        ];
+
+        session(['buy_now_item' => $buyNowItem]);
+
+        // PERBAIKAN: Gunakan nama route yang benar sesuai routes/web.php
+        return redirect()->route('user.checkout.index');
+    }
+
+                public function checkout()
+    {
+        $buyNowItem = session('buy_now_item');
+
+        if ($buyNowItem) {
+            // === MODE BUY NOW ===
+            $product = Product::findOrFail($buyNowItem['product_id']);
+
+            $cartItems = collect([
+                (object) [
+                    'product_id' => $product->id,
+                    'product'    => $product,
+                    'quantity'   => $buyNowItem['quantity'],
+                    'price'      => $buyNowItem['price'],
+                    'is_selected'=> true,
+                ]
+            ]);
+
+            // JANGAN forget di sini! Biarkan session tetap ada sampai processCheckout berhasil
+        } 
+        else {
+            // === MODE KERANJANG NORMAL ===
+            $cartItems = Cart::where('user_id', Auth::id())
+                ->where('is_selected', true)
+                ->with('product')
+                ->get();
+        }
 
         if ($cartItems->isEmpty()) {
-            return redirect()->route('user.cart.index')->with('error', 'Keranjang kosong!');
+            return redirect()->route('user.cart.index')
+                ->with('error', 'Tidak ada item untuk di checkout!');
         }
 
         $subtotal = $cartItems->sum(fn($item) => $item->price * $item->quantity);
@@ -142,19 +197,56 @@ class CartController extends Controller
         ]);
 
         $user = Auth::user();
+        $buyNowItem = session('buy_now_item');
+        $isBuyNow = !is_null($buyNowItem);
 
         DB::beginTransaction();
         try {
-            $cartItems = Cart::where('user_id', $user->id)
-                ->where('is_selected', true)
-                ->with('product')
-                ->get();
+            if ($isBuyNow) {
+                // ==================== BUY NOW MODE ====================
+                $product = Product::lockForUpdate()->findOrFail($buyNowItem['product_id']);
 
-            if ($cartItems->isEmpty()) {
-                DB::rollBack();
-                return redirect()->back()->with('error', 'Keranjang kosong!');
+                if (!$product->isAvailable() || $product->stock < $buyNowItem['quantity']) {
+                    DB::rollBack();
+                    session()->forget('buy_now_item');
+                    return redirect()->back()
+                        ->with('error', "❌ Stok {$product->name} tidak mencukupi atau sudah habis!");
+                }
+
+                $cartItems = collect([
+                    (object) [
+                        'product_id' => $product->id,
+                        'quantity'   => $buyNowItem['quantity'],
+                        'price'      => $product->price,
+                    ]
+                ]);
+            } 
+            else {
+                // ==================== NORMAL CART MODE ====================
+                $cartItems = Cart::where('user_id', $user->id)
+                    ->where('is_selected', true)
+                    ->with('product')
+                    ->get();
+
+                if ($cartItems->isEmpty()) {
+                    DB::rollBack();
+                    return redirect()->back()->with('error', 'Keranjang kosong!');
+                }
+
+                foreach ($cartItems as $item) {
+                    $product = Product::lockForUpdate()->findOrFail($item->product_id);
+
+                    if (!$product->isAvailable() || $product->stock < $item->quantity) {
+                        DB::rollBack();
+                        return redirect()->back()
+                            ->with('error', "❌ Stok {$product->name} tidak mencukupi atau sudah habis!");
+                    }
+
+                    $product->decrement('stock', $item->quantity);
+                }
             }
 
+            // Hitung total
             $subtotal = $cartItems->sum(fn($item) => $item->price * $item->quantity);
             $shippingCost = $request->shipping_cost ?? 20000;
             $total = $subtotal + $shippingCost;
@@ -175,34 +267,38 @@ class CartController extends Controller
                 'notes'            => $validated['notes'] ?? null,
             ]);
 
+            // Buat Transaction Items
             foreach ($cartItems as $item) {
-                $product = Product::lockForUpdate()->findOrFail($item->product_id);
+                $productForItem = $isBuyNow 
+                    ? Product::find($item->product_id) 
+                    : $item->product;
 
-                // === VALIDASI STOK FINAL ===
-                if (!$product->isAvailable() || $product->stock < $item->quantity) {
-                    DB::rollBack();
-                    return redirect()->back()
-                        ->with('error', "❌ Stok {$product->name} tidak mencukupi atau sudah habis!");
-                }
-
-                // Kurangi stok
-                $product->decrement('stock', $item->quantity);
-
-                // Buat item transaksi
                 TransactionItem::create([
                     'transaction_id' => $transaction->id,
-                    'product_id'     => $product->id,
-                    'product_name'   => $product->name,
+                    'product_id'     => $item->product_id,
+                    'product_name'   => $productForItem->name,
                     'quantity'       => $item->quantity,
-                    'price'          => $product->price,
-                    'subtotal'       => $product->price * $item->quantity,
+                    'price'          => $item->price,
+                    'subtotal'       => $item->price * $item->quantity,
                 ]);
+
+                // Kurangi stok (sudah dicek di atas)
+                if ($isBuyNow) {
+                    Product::find($item->product_id)->decrement('stock', $item->quantity);
+                }
             }
 
-            // Hapus item yang sudah dibeli dari keranjang
-            Cart::where('user_id', $user->id)
-                ->where('is_selected', true)
-                ->delete();
+            // Hapus dari keranjang hanya jika bukan Buy Now
+            if (!$isBuyNow) {
+                Cart::where('user_id', $user->id)
+                    ->where('is_selected', true)
+                    ->delete();
+            }
+
+            // Hapus session Buy Now setelah berhasil
+            if ($isBuyNow) {
+                session()->forget('buy_now_item');
+            }
 
             DB::commit();
 
@@ -217,6 +313,7 @@ class CartController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+            if ($isBuyNow) session()->forget('buy_now_item');
             return redirect()->back()->with('error', 'Terjadi kesalahan saat checkout. Silakan coba lagi.');
         }
     }

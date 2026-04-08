@@ -77,24 +77,68 @@ class ChatController extends Controller
     }
 
     public function sendMessage(Request $request)
-    {
-        $request->validate([
-            'message' => 'required|string|max:1000',
-            'admin_id' => 'nullable|exists:users,id',
-        ]);
+{
+    $request->validate([
+        'message' => 'required|string|max:1000',
+        'admin_id' => 'nullable|exists:users,id',
+    ]);
+
+    // Simpan pesan user
+    $chat = Chat::create([
+        'user_id' => auth()->id(),
+        'admin_id' => $request->admin_id,
+        'message' => $request->message,
+        'sender' => 'user',
+        'is_read' => false,
+    ]);
+
+    // =========================
+    // AUTO REPLY BOT (CS AI)
+    // =========================
+    if (!$request->admin_id) {
+        $botReply = $this->generateBotReply($request->message);
 
         Chat::create([
             'user_id' => auth()->id(),
-            'admin_id' => $request->admin_id,
-            'message' => $request->message,
-            'sender' => 'user',
+            'admin_id' => null,
+            'message' => $botReply,
+            'sender' => 'admin', // dianggap CS
             'is_read' => false,
         ]);
-
-        // Redirect back with admin_id preserved
-        return redirect()->route('user.chat.index', ['admin' => $request->admin_id])
-            ->with('success', 'Pesan terkirim!');
     }
+
+    return redirect()->route('user.chat.index', ['admin' => $request->admin_id])
+        ->with('success', 'Pesan terkirim!');
+}
+
+private function generateBotReply($message)
+{
+    $msg = strtolower($message);
+
+    // Keyword sederhana
+    if (str_contains($msg, 'halo') || str_contains($msg, 'hai')) {
+        return 'Halo! 😊 Ada yang bisa kami bantu?';
+    }
+
+    if (str_contains($msg, 'harga')) {
+        return 'Untuk informasi harga, silakan cek halaman produk ya 👍';
+    }
+
+    if (str_contains($msg, 'pengiriman')) {
+        return 'Pengiriman biasanya memakan waktu 2-5 hari kerja 🚚';
+    }
+
+    if (str_contains($msg, 'jam kerja')) {
+        return 'Jam operasional kami 08:00 - 21:00 WIB ⏰';
+    }
+
+    if (str_contains($msg, 'terima kasih')) {
+        return 'Sama-sama 😊 Senang bisa membantu!';
+    }
+
+    // Default jawabannya
+    return 'Terima kasih atas pesan Anda 🙏 Tim kami akan segera membantu Anda.';
+}
 
     public function getMessages($adminId)
     {
